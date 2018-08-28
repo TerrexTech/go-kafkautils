@@ -44,7 +44,6 @@ type Consumer struct {
 	consumer         Adapter
 	isClosed         bool
 	isLoggingEnabled bool
-	closeChan        chan bool
 }
 
 // To facilitate testing. This var gets overwritten by custom init function.

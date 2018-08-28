@@ -179,7 +179,7 @@ var _ = Describe("Producer", func() {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				for _ = range fakeProducer.Errors() {
+				for range fakeProducer.Errors() {
 					isErrorForwarded = true
 				}
 			}()

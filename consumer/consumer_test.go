@@ -108,7 +108,7 @@ var _ = Describe("Consumer", func() {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				for _ = range fakeConsumer.Errors() {
+				for range fakeConsumer.Errors() {
 					isErrorForwarded = true
 				}
 			}()
@@ -126,8 +126,8 @@ var _ = Describe("Consumer", func() {
 
 	Context("new message is received", func() {
 		var (
-			config             *Config
-			fakeConsumer       *mocks.Consumer
+			config       *Config
+			fakeConsumer *mocks.Consumer
 		)
 
 		BeforeEach(func() {
@@ -147,7 +147,7 @@ var _ = Describe("Consumer", func() {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				for _ = range fakeConsumer.Messages() {
+				for range fakeConsumer.Messages() {
 					isMsgForwarded = true
 				}
 			}()
