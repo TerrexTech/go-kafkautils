@@ -38,9 +38,6 @@ func setupMockConsumer(initConfig *Config) (*Consumer, *mocks.Consumer, error) {
 	proxyConsumer.consumer = fakeConsumer
 	// Re-attach the handlers
 	proxyConsumer.handleKeyInterrupt()
-	proxyConsumer.handleErrors(initConfig.ErrHandler)
-	proxyConsumer.handleMessages(initConfig.MsgHandler)
-	proxyConsumer.handleNotifications(initConfig.NtfnHandler)
 	return proxyConsumer, fakeConsumer, err
 }
 
@@ -50,8 +47,7 @@ func setupMockConsumer(initConfig *Config) (*Consumer, *mocks.Consumer, error) {
 var _ = Describe("Consumer", func() {
 	Context("new instance is requested", func() {
 		var (
-			config     *Config
-			errHandler func(*error)
+			config *Config
 
 			proxyConsumer *Consumer
 			err           error
@@ -60,13 +56,9 @@ var _ = Describe("Consumer", func() {
 		BeforeEach(func() {
 			initFunc = mockInitFunc
 
-			errHandler = func(err *error) {
-				Fail("Error occurred: " + (*err).Error())
-			}
 			config = &Config{
 				ConsumerGroup: "test-group",
 				KafkaBrokers:  []string{"test-broker"},
-				ErrHandler:    errHandler,
 				Topics:        []string{"test-topics"},
 			}
 			proxyConsumer, _, err = setupMockConsumer(config)
@@ -87,9 +79,7 @@ var _ = Describe("Consumer", func() {
 		})
 
 		It("should return error when no brokers are provided", func() {
-			config = &Config{
-				ErrHandler: errHandler,
-			}
+			config.KafkaBrokers = nil
 			_, err := New(config)
 			Expect(err).To(HaveOccurred())
 		})
@@ -97,21 +87,14 @@ var _ = Describe("Consumer", func() {
 
 	Context("an error occurs while fetching messages", func() {
 		var (
-			config             *Config
-			errHandler         func(*error)
-			isErrHandlerCalled bool
-			fakeConsumer       *mocks.Consumer
+			config       *Config
+			fakeConsumer *mocks.Consumer
 		)
 
 		BeforeEach(func() {
-			isErrHandlerCalled = false
-			errHandler = func(_ *error) {
-				isErrHandlerCalled = true
-			}
 			config = &Config{
 				ConsumerGroup: "test-group",
 				KafkaBrokers:  []string{"test-broker"},
-				ErrHandler:    errHandler,
 				Topics:        []string{"test-topics"},
 			}
 			_, fakeConsumer, _ = setupMockConsumer(config)
@@ -120,44 +103,37 @@ var _ = Describe("Consumer", func() {
 			fakeConsumer.Close()
 		})
 
-		It("should run the error-handler function", func() {
+		It("should forward errors to error-channel", func() {
+			isErrorForwarded := false
 			var wg sync.WaitGroup
 			wg.Add(1)
+			go func() {
+				for _ = range fakeConsumer.Errors() {
+					isErrorForwarded = true
+				}
+			}()
 			go func() {
 				fakeConsumer.ErrorsChan <- fakeConsumer.CreateMockError()
 				defer wg.Done()
 			}()
 			wg.Wait()
 
-			// Wait for error-handler routines to complete
+			// Wait for error-routines to complete
 			time.Sleep(5 * time.Millisecond)
-			Expect(isErrHandlerCalled).To(BeTrue())
+			Expect(isErrorForwarded).To(BeTrue())
 		})
 	})
 
 	Context("new message is received", func() {
 		var (
 			config             *Config
-			errHandler         func(*error)
-			msgHandler         func(*sarama.ConsumerMessage, *Consumer)
-			isMsgHandlerCalled bool
 			fakeConsumer       *mocks.Consumer
 		)
 
 		BeforeEach(func() {
-			isMsgHandlerCalled = false
-			errHandler = func(err *error) {
-				Fail("Error occurred: " + (*err).Error())
-			}
-			msgHandler = func(_ *sarama.ConsumerMessage, _ *Consumer) {
-				isMsgHandlerCalled = true
-			}
-
 			config = &Config{
 				ConsumerGroup: "test-group",
 				KafkaBrokers:  []string{"test-broker"},
-				ErrHandler:    errHandler,
-				MsgHandler:    msgHandler,
 				Topics:        []string{"test-topics"},
 			}
 			_, fakeConsumer, _ = setupMockConsumer(config)
@@ -166,84 +142,39 @@ var _ = Describe("Consumer", func() {
 			fakeConsumer.Close()
 		})
 
-		It("should run the message-handler function", func() {
+		It("should forward messages to message-channel", func() {
+			isMsgForwarded := false
 			var wg sync.WaitGroup
 			wg.Add(1)
+			go func() {
+				for _ = range fakeConsumer.Messages() {
+					isMsgForwarded = true
+				}
+			}()
 			go func() {
 				fakeConsumer.MessagesChan <- fakeConsumer.CreateMockMessage("test", "test", "test")
 				defer wg.Done()
 			}()
 			wg.Wait()
 
-			// Wait for error-handler routines to complete
+			// Wait for message-routines to complete
 			time.Sleep(5 * time.Millisecond)
-			Expect(isMsgHandlerCalled).To(BeTrue())
-		})
-	})
-
-	Context("new notification is received", func() {
-		var (
-			config              *Config
-			errHandler          func(*error)
-			ntfnHandler         func(*cluster.Notification)
-			isNtfnHandlerCalled bool
-			fakeConsumer        *mocks.Consumer
-		)
-
-		BeforeEach(func() {
-			isNtfnHandlerCalled = false
-			errHandler = func(err *error) {
-				Fail("Error occurred: " + (*err).Error())
-			}
-			ntfnHandler = func(_ *cluster.Notification) {
-				isNtfnHandlerCalled = true
-			}
-
-			config = &Config{
-				ConsumerGroup: "test-group",
-				KafkaBrokers:  []string{"test-broker"},
-				ErrHandler:    errHandler,
-				NtfnHandler:   ntfnHandler,
-				Topics:        []string{"test-topics"},
-			}
-			_, fakeConsumer, _ = setupMockConsumer(config)
-		})
-		AfterEach(func() {
-			fakeConsumer.Close()
-		})
-
-		It("should run the message-handler function", func() {
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				fakeConsumer.NotificationsChan <- fakeConsumer.CreateMockNotification()
-				defer wg.Done()
-			}()
-			wg.Wait()
-
-			// Wait for error-handler routines to complete
-			time.Sleep(5 * time.Millisecond)
-			Expect(isNtfnHandlerCalled).To(BeTrue())
+			Expect(isMsgForwarded).To(BeTrue())
 		})
 	})
 
 	Context("consumer is requested to be closed", func() {
 		var (
-			config     *Config
-			errHandler func(*error)
+			config *Config
 
 			proxyConsumer *Consumer
 			fakeConsumer  *mocks.Consumer
 		)
 
 		BeforeEach(func() {
-			errHandler = func(err *error) {
-				Fail("Error occurred: " + (*err).Error())
-			}
 			config = &Config{
 				ConsumerGroup: "test-group",
 				KafkaBrokers:  []string{"test-broker"},
-				ErrHandler:    errHandler,
 				Topics:        []string{"test-topics"},
 			}
 			proxyConsumer, fakeConsumer, _ = setupMockConsumer(config)

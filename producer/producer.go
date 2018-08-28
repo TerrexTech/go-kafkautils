@@ -21,7 +21,6 @@ type Adapter interface {
 
 // Config wraps configuration for producer
 type Config struct {
-	ErrHandler   func(*sarama.ProducerError)
 	KafkaBrokers []string
 	// Allow overwriting default sarama-config
 	SaramaConfig *sarama.Config
@@ -61,7 +60,6 @@ func New(initConfig *Config) (*Producer, error) {
 		isLoggingEnabled: false,
 	}
 	proxyProducer.handleKeyInterrupt()
-	proxyProducer.handleErrors(initConfig.ErrHandler)
 	return &proxyProducer, nil
 }
 
@@ -127,16 +125,9 @@ func (p *Producer) handleKeyInterrupt() {
 	}()
 }
 
-func (p *Producer) handleErrors(errHandler func(*sarama.ProducerError)) {
-	producer := *p.SaramaProducer()
-	go func() {
-		for err := range producer.Errors() {
-			if p.isLoggingEnabled {
-				log.Fatalln("Failed to produce message", err)
-			}
-			errHandler(err)
-		}
-	}()
+// Errors returns the error-channel for Producer.
+func (p *Producer) Errors() <-chan *sarama.ProducerError {
+	return p.producer.Errors()
 }
 
 // Close attempts to close the producer,

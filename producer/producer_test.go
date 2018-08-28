@@ -41,7 +41,6 @@ func setupMockProducer(config *Config) (*Producer, *mocks.AsyncProducer) {
 	// Close the actual producer, since it will be replaced by a mock
 	asyncProducer.producer.Close()
 	asyncProducer.producer = &fakeProducer
-	asyncProducer.handleErrors(config.ErrHandler)
 
 	return asyncProducer, &fakeProducer
 }
@@ -52,7 +51,6 @@ var _ = Describe("Producer", func() {
 			mockBroker *sarama.MockBroker
 			brokerAddr string
 			config     *Config
-			errHandler func(*sarama.ProducerError)
 
 			asyncProducer *Producer
 			err           error
@@ -62,12 +60,8 @@ var _ = Describe("Producer", func() {
 			// Setup a default basic producer-pipeline
 			mockBroker, brokerAddr = setupMockBroker()
 
-			errHandler = func(err *sarama.ProducerError) {
-				Fail("Error occurred: " + err.Error())
-			}
 			config = &Config{
 				KafkaBrokers: []string{brokerAddr},
-				ErrHandler:   errHandler,
 			}
 			asyncProducer, err = New(config)
 		})
@@ -84,16 +78,13 @@ var _ = Describe("Producer", func() {
 		It("should return the error when initializing new producer fails", func() {
 			config = &Config{
 				KafkaBrokers: []string{"invalid-broker"},
-				ErrHandler:   errHandler,
 			}
 			_, err := New(config)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("should return error when no brokers are provided", func() {
-			config = &Config{
-				ErrHandler: errHandler,
-			}
+			config = &Config{}
 			_, err := New(config)
 			Expect(err).To(HaveOccurred())
 		})
@@ -104,7 +95,6 @@ var _ = Describe("Producer", func() {
 			mockBroker *sarama.MockBroker
 			brokerAddr string
 			config     *Config
-			errHandler func(*sarama.ProducerError)
 
 			asyncProducer *Producer
 			fakeProducer  *mocks.AsyncProducer
@@ -117,12 +107,8 @@ var _ = Describe("Producer", func() {
 			// Setup a default basic producer-pipeline
 			mockBroker, brokerAddr = setupMockBroker()
 
-			errHandler = func(err *sarama.ProducerError) {
-				Fail("Error occurred: " + err.Error())
-			}
 			config = &Config{
 				KafkaBrokers: []string{brokerAddr},
-				ErrHandler:   errHandler,
 			}
 			asyncProducer, fakeProducer = setupMockProducer(config)
 		})
@@ -166,11 +152,9 @@ var _ = Describe("Producer", func() {
 
 	Context("an error occurs while producing messages", func() {
 		var (
-			mockBroker         *sarama.MockBroker
-			brokerAddr         string
-			config             *Config
-			errHandler         func(*sarama.ProducerError)
-			isErrHandlerCalled bool
+			mockBroker *sarama.MockBroker
+			brokerAddr string
+			config     *Config
 
 			asyncProducer *Producer
 			fakeProducer  *mocks.AsyncProducer
@@ -180,15 +164,10 @@ var _ = Describe("Producer", func() {
 			// Setup a default basic producer-pipeline
 			mockBroker, brokerAddr = setupMockBroker()
 
-			errHandler = func(_ *sarama.ProducerError) {
-				isErrHandlerCalled = true
-			}
 			config = &Config{
 				KafkaBrokers: []string{brokerAddr},
-				ErrHandler:   errHandler,
 			}
 			asyncProducer, fakeProducer = setupMockProducer(config)
-			isErrHandlerCalled = false
 		})
 		AfterEach(func() {
 			asyncProducer.Close()
@@ -196,8 +175,14 @@ var _ = Describe("Producer", func() {
 		})
 
 		It("should run the error-handler function", func() {
+			isErrorForwarded := false
 			var wg sync.WaitGroup
 			wg.Add(1)
+			go func() {
+				for _ = range fakeProducer.Errors() {
+					isErrorForwarded = true
+				}
+			}()
 			go func() {
 				fakeProducer.ErrorsChan <- fakeProducer.CreateMockError("test", "test", "test")
 				defer wg.Done()
@@ -206,7 +191,7 @@ var _ = Describe("Producer", func() {
 
 			// Wait for error-handler routines to complete
 			time.Sleep(5 * time.Millisecond)
-			Expect(isErrHandlerCalled).To(BeTrue())
+			Expect(isErrorForwarded).To(BeTrue())
 		})
 	})
 
@@ -215,7 +200,6 @@ var _ = Describe("Producer", func() {
 			mockBroker *sarama.MockBroker
 			brokerAddr string
 			config     Config
-			errHandler func(*sarama.ProducerError)
 
 			asyncProducer *Producer
 			fakeProducer  *mocks.AsyncProducer
@@ -224,16 +208,12 @@ var _ = Describe("Producer", func() {
 		BeforeEach(func() {
 			// Setup a default basic producer-pipeline
 			mockBroker, brokerAddr = setupMockBroker()
-
-			errHandler = func(err *sarama.ProducerError) {
-				Fail("Error occurred: " + err.Error())
-			}
 			config = Config{
 				KafkaBrokers: []string{brokerAddr},
-				ErrHandler:   errHandler,
 			}
 			asyncProducer, fakeProducer = setupMockProducer(&config)
 		})
+
 		AfterEach(func() {
 			asyncProducer.Close()
 			mockBroker.Close()
