@@ -33,10 +33,7 @@ type Adapter interface {
 // Config wraps configuration for consumer
 type Config struct {
 	ConsumerGroup string
-	ErrHandler    func(*error)
 	KafkaBrokers  []string
-	MsgHandler    func(*sarama.ConsumerMessage, *Consumer)
-	NtfnHandler   func(*cluster.Notification)
 	// Allow overwriting default sarama-config
 	SaramaConfig *cluster.Config
 	Topics       []string
@@ -49,11 +46,9 @@ type Consumer struct {
 	isLoggingEnabled bool
 }
 
-// To facilitate testing. This var gets overwritten by custon
-// init function.
-// We don't pass the init function as argument or
-// via dependency-injection because the purpose of
-// this library is to highly abstract the kafka configs
+// To facilitate testing. This var gets overwritten by custom init function.
+// We don't pass the init function as argument or via dependency-injection
+// because the purpose of this library is to abstract the kafka configs.
 var initFunc func([]string, string, []string, *cluster.Config) (*cluster.Consumer, error)
 
 func init() {
@@ -75,7 +70,6 @@ func New(initConfig *Config) (*Consumer, error) {
 		config.Consumer.Offsets.Initial = sarama.OffsetNewest
 		config.Consumer.MaxProcessingTime = 10 * time.Second
 		config.Consumer.Return.Errors = true
-		config.Group.Return.Notifications = true
 	}
 
 	consumer, err := initFunc(initConfig.KafkaBrokers, initConfig.ConsumerGroup, initConfig.Topics, config)
@@ -91,16 +85,12 @@ func New(initConfig *Config) (*Consumer, error) {
 		isLoggingEnabled: false,
 	}
 
-	// Don't run these functions when mocking consumer,
-	// where initial consumer is nil.
+	// Don't run this function when mocking consumer, where
+	// initial consumer is nil.
 	// This initialization is controlled by mock consumer.
 	if consumer != nil {
 		proxyConsumer.handleKeyInterrupt()
-		proxyConsumer.handleErrors(initConfig.ErrHandler)
-		proxyConsumer.handleMessages(initConfig.MsgHandler)
-		proxyConsumer.handleNotifications(initConfig.NtfnHandler)
 	}
-	// log.Println("Consumer waiting for messages.")
 	return &proxyConsumer, nil
 }
 
@@ -130,51 +120,20 @@ func (c *Consumer) handleKeyInterrupt() {
 	// Elegant exit
 	go func() {
 		<-sigChan
-		log.Println("Keyboard-Interrupt signal received.")
+		log.Println("Keyboard-Interrupt signal received, cleaning up before closing")
 		closeError := <-c.Close()
 		log.Println(closeError)
 	}()
 }
 
-func (c *Consumer) handleErrors(errHandler func(*error)) {
-	consumer := c.SaramaConsumerGroup()
-	go func() {
-		for err := range consumer.Errors() {
-			if c.isLoggingEnabled {
-				log.Fatalln("Failed to read messages from topic:", err)
-			}
-			if errHandler != nil {
-				errHandler(&err)
-			}
-		}
-	}()
+// Errors returns the error-channel for Consumer.
+func (c *Consumer) Errors() <-chan error {
+	return c.consumer.Errors()
 }
 
-func (c *Consumer) handleMessages(msgHandler func(*sarama.ConsumerMessage, *Consumer)) {
-	consumer := c.SaramaConsumerGroup()
-	go func() {
-		for message := range consumer.Messages() {
-			if c.isLoggingEnabled {
-				log.Printf("Topic: %s\t Partition: %v\t Offset: %v\n", message.Topic, message.Partition, message.Offset)
-			}
-			msgHandler(message, c)
-		}
-	}()
-}
-
-// Consumer-Rebalancing notifications
-func (c *Consumer) handleNotifications(ntfnHandler func(*cluster.Notification)) {
-	consumer := c.SaramaConsumerGroup()
-	go func() {
-		for ntf := range consumer.Notifications() {
-			if c.isLoggingEnabled {
-				log.Printf("Rebalanced: %+v\n", ntf)
-			}
-			if ntfnHandler != nil {
-				ntfnHandler(ntf)
-			}
-		}
-	}()
+// Messages returns the messages-channel for Consumer.
+func (c *Consumer) Messages() <-chan *sarama.ConsumerMessage {
+	return c.consumer.Messages()
 }
 
 // Close attempts to close the consumer,

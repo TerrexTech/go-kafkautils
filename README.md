@@ -26,61 +26,56 @@ import github.com/TerrexTech/go-kafkautils/producer // Import Producer
 #### Consumer:
 
 ```Go
-msgHandler := func(msg *sarama.ConsumerMessage, c *consumer.Consumer) {
-  // Convert from []byte to string
-  println("Received message: ", string(msg.Value))
-  consumer := c.Get()
-  if !c.IsClosed() {
-    consumer.MarkOffset(msg, "")
-  } else {
-    log.Fatalln("Consumer was closed before offsets could be marked.")
-  }
-}
-
-errHandler := func(e *error) {
-  log.Fatalln((*e).Error())
-}
-
 config := consumer.Config{
   ConsumerGroup: "test",
-  ErrHandler:    errHandler,
   KafkaBrokers:  []string{"localhost:9092"},
-  MsgHandler:    msgHandler,
   Topics:        []string{"test"},
 }
 
-proxyconsumer, _ := consumer.New(&config)
+proxyconsumer, err := consumer.New(&config)
+if err != nil {
+  panic(err)
+}
 proxyconsumer.EnableLogging()
 
-// Temporary hack for simplicity. Use channels/app-logic in actual application.
-time.Sleep(100000 * time.Millisecond)
+// Read Errors
+go func() {
+  for err := proxyConsumer.Errors() {
+    log.Println(err)
+  }
+}()
+
+// Read Messages
+go func() {
+  for msg := proxyConsumer.Messages() {
+    log.Println(msg)
+  }
+}()
 ```
 
 #### Producer:
 
 ```Go
-errHandler := func(err *sarama.ProducerError) {
-  errs := *err
-  fmt.Println(errs.Error())
-}
 config := producer.Config{
-  ErrHandler:   errHandler,
   KafkaBrokers: []string{"localhost:9092"},
 }
 asyncProducer, err := producer.New(&config)
+if err != nil {
+  panic(err)
+}
 asyncProducer.EnableLogging()
+
+go func() {
+  for err := asyncProducer.Errors() {
+    log.Println(err)
+  }
+}()
 
 strTime := strconv.Itoa(int(time.Now().Unix()))
 msg := asyncProducer.CreateKeyMessage("test", strTime, "testValue")
 
-if err != nil {
-  panic(err)
-}
 input, _ := asyncProducer.Input()
-input <- msg
-
-// Temporary hack for simplicity. Use channels/app-logic in actual application.
-time.Sleep(2000 * time.Millisecond)
+input <- msg // Produce message
 ```
 
   [0]: https://github.com/Shopify/sarama
