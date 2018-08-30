@@ -34,7 +34,7 @@ type Adapter interface {
 type Config struct {
 	ConsumerGroup string
 	KafkaBrokers  []string
-	// Allow overwriting default sarama-config
+	// Overwrites the default sarama-config
 	SaramaConfig *cluster.Config
 	Topics       []string
 }
@@ -102,6 +102,19 @@ func (c *Consumer) EnableLogging() {
 // IsClosed returns a bool specifying if Kafka consumer is closed
 func (c *Consumer) IsClosed() bool {
 	return c.isClosed
+}
+
+// MarkOffset marks the provided message as processed, alongside a metadata string
+// that represents the state of the partition consumer at that point in time.
+// The metadata string can be used by another consumer to restore that state, so
+// it can resume consumption.
+
+// Note: calling MarkOffset does not necessarily commit the offset to the backend
+// store immediately for efficiency reasons, and it may never be committed if your
+// application crashes. This means that you may end up processing the same message
+// twice, and your processing should ideally be idempotent.
+func (c *Consumer) MarkOffset(msg *sarama.ConsumerMessage, metadata string) {
+	c.consumer.MarkOffset(msg, metadata)
 }
 
 // SaramaConsumerGroup returns the original Sarama Kafka consumer-group
