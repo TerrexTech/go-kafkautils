@@ -67,7 +67,7 @@ func New(initConfig *Config) (*Consumer, error) {
 		config = initConfig.SaramaConfig
 	} else {
 		config = cluster.NewConfig()
-		config.Consumer.Offsets.Initial = sarama.OffsetNewest
+		config.Consumer.Offsets.Initial = sarama.OffsetOldest
 		config.Consumer.MaxProcessingTime = 10 * time.Second
 		config.Consumer.Return.Errors = true
 	}
