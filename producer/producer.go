@@ -68,25 +68,6 @@ func (p *Producer) EnableLogging() {
 	p.isLoggingEnabled = true
 }
 
-// CreateKeyMessage creates producer-formatted message with key
-func (p *Producer) CreateKeyMessage(topic string, key string, value string) *sarama.ProducerMessage {
-	msg := &sarama.ProducerMessage{
-		Topic: topic,
-		Value: sarama.StringEncoder(value),
-	}
-
-	if key != "" {
-		msg.Key = sarama.StringEncoder(key)
-	}
-
-	return msg
-}
-
-// CreateMessage creates keyless producer-formatted message
-func (p *Producer) CreateMessage(topic string, value string) *sarama.ProducerMessage {
-	return p.CreateKeyMessage(topic, "", value)
-}
-
 // IsClosed returns a bool specifying if Kafka producer is closed
 func (p *Producer) IsClosed() bool {
 	return p.isClosed

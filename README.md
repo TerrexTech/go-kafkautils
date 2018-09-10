@@ -72,7 +72,7 @@ go func() {
 }()
 
 strTime := strconv.Itoa(int(time.Now().Unix()))
-msg := asyncProducer.CreateKeyMessage("test", strTime, "testValue")
+msg := producer.CreateKeyMessage("test", strTime, []byte("testValue"))
 
 input, _ := asyncProducer.Input()
 input <- msg // Produce message
