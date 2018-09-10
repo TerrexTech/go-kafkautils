@@ -9,6 +9,10 @@ go:
 git:
   depth: 1
 
+branches:
+  except:
+    - staging.tmp
+
 env:
   global:
     - DEP_VERSION="0.5.0"
