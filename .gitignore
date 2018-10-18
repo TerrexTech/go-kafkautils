@@ -1,7 +1,5 @@
-# IDE
-.vscode
 .history
-
-# Glide
-glide.lock
-vendor
+.vagrant
+.vscode
+debug*
+vendor*
