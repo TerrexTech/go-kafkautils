@@ -52,7 +52,7 @@ func NewConsumer(config *ConsumerConfig) (*Consumer, error) {
 		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
 		saramaConfig.Consumer.MaxProcessingTime = 10 * time.Second
 		saramaConfig.Consumer.Return.Errors = true
-		saramaConfig.Version = sarama.V0_11_0_2
+		saramaConfig.Version = sarama.V2_0_0_0
 	}
 
 	// Create Consumer-Group
