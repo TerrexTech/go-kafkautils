@@ -1,8 +1,8 @@
-package producer
+package kafka
 
 import "github.com/Shopify/sarama"
 
-// CreateKeyMessage creates producer-formatted message with key
+// CreateKeyMessage creates producer-formatted message with key.
 func CreateKeyMessage(topic string, key string, value []byte) *sarama.ProducerMessage {
 	msg := &sarama.ProducerMessage{
 		Topic: topic,
@@ -16,7 +16,7 @@ func CreateKeyMessage(topic string, key string, value []byte) *sarama.ProducerMe
 	return msg
 }
 
-// CreateMessage creates keyless producer-formatted message
+// CreateMessage creates keyless producer-formatted message.
 func CreateMessage(topic string, value []byte) *sarama.ProducerMessage {
 	return CreateKeyMessage(topic, "", value)
 }
