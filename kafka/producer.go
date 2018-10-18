@@ -37,7 +37,7 @@ func NewProducer(config *ProducerConfig) (*Producer, error) {
 		saramaConfig.Producer.Return.Errors = true
 		saramaConfig.Producer.RequiredAcks = sarama.WaitForAll
 		saramaConfig.Producer.Compression = sarama.CompressionNone
-		saramaConfig.Version = sarama.V0_11_0_2
+		saramaConfig.Version = sarama.V2_0_0_0
 	}
 
 	producer, err := sarama.NewAsyncProducer(config.KafkaBrokers, saramaConfig)

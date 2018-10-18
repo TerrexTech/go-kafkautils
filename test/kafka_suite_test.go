@@ -37,6 +37,8 @@ func (mh msgHandler) ConsumeClaim(
 		v := string(msg.Value)
 		log.Println(v)
 
+		// Mark message as consumed
+		session.MarkMessage(msg, "")
 		if mh.valuesMap[v] != nil {
 			delete(mh.valuesMap, string(msg.Value))
 		}
