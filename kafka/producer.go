@@ -1,11 +1,6 @@
 package kafka
 
 import (
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-
 	"github.com/Shopify/sarama"
 	"github.com/pkg/errors"
 )
@@ -46,26 +41,5 @@ func NewProducer(config *ProducerConfig) (*Producer, error) {
 	}
 
 	asyncProducer := Producer{producer}
-	asyncProducer.handleKeyInterrupt()
 	return &asyncProducer, nil
-}
-
-func (p *Producer) handleKeyInterrupt() {
-	// Capture the Ctrl+C signal (interrupt or kill)
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-
-	// Elegant exit
-	go func() {
-		<-sigChan
-		// We always log here, special situation
-		log.Println("Keyboard-Interrupt signal received.")
-		err := p.Close()
-		if err != nil {
-			log.Println(err.Error())
-		}
-	}()
 }
