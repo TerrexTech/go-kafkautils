@@ -2,10 +2,6 @@ package kafka
 
 import (
 	"context"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -70,7 +66,6 @@ func NewConsumer(config *ConsumerConfig) (*Consumer, error) {
 		consumerGroup: consumerGroup,
 		topics:        config.Topics,
 	}
-	consumer.handleKeyInterrupt()
 	return consumer, nil
 }
 
@@ -96,23 +91,6 @@ func (c *Consumer) Consume(
 // Only use this when you really have to.
 func (c *Consumer) SaramaConsumer() *sarama.ConsumerGroup {
 	return &c.consumerGroup
-}
-
-func (c *Consumer) handleKeyInterrupt() {
-	// Capture the Ctrl+C signal (interrupt or kill)
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-
-	// Elegant exit
-	go func() {
-		<-sigChan
-		log.Println("Keyboard-Interrupt signal received, cleaning up before closing")
-		closeError := c.consumerGroup.Close()
-		log.Println(closeError)
-	}()
 }
 
 // Close stops the ConsumerGroup and detaches any running sessions. It is required to call
